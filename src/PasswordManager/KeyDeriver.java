@@ -15,6 +15,7 @@ public class KeyDeriver {
         if (salt == null) {
             throw new IllegalArgumentException("Salt must not be null");
         }
+
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyLength);
         SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         return skf.generateSecret(spec).getEncoded();
