@@ -12,15 +12,30 @@ public class Starter {
         showMainMenu();
     }
 
-    private static void initializeApplication() {
-        System.out.print("Введите мастер-пароль: ");
-        masterPassword = scanner.nextLine();
 
-        try {
-            manager.loadEntries(masterPassword);
-        } catch (Exception e) {
-            System.out.println("Ошибка загрузки данных. Проверьте пароль.");
-            return;
+    private static void initializeApplication() {
+        final int MAX_ATTEMPTS = 3;
+
+        for (int attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
+            if (attempt == 0) {
+                System.out.print("Введите мастер-пароль: ");
+            } else {
+                System.out.printf("Ошибка: Проверьте пароль. У вас осталось %d попыток.\n", MAX_ATTEMPTS - attempt + 1);
+                System.out.print("Повторите ввод: ");
+            }
+
+            String inputPass = scanner.nextLine();
+
+            try {
+                manager.loadEntries(inputPass);
+                masterPassword = inputPass;
+                return;
+            } catch (Exception e) {
+                if (attempt == MAX_ATTEMPTS) {
+                    System.out.println("Ошибка: Проверьте пароль. Попытки истекли.");
+                    System.exit(0);
+                }
+            }
         }
     }
 
