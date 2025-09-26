@@ -45,29 +45,17 @@ public class Starter {
             int choice = getMenuChoice();
 
             switch (choice) {
-                case 1:
-                    addEntry();
-                    break;
-                case 2:
-                    deleteEntry();
-                    break;
-                case 3:
-                    displayAllEntries();
-                    break;
-                case 4:
-                    viewSpecificEntry();
-                    break;
-                case 5:
-                    editEntry();
-                    break;
-                case 6:
-                    changeMasterPassword();
-                    break;
-                case 7:
+                case 1 -> addEntry();
+                case 2 -> deleteEntry();
+                case 3 -> displayAllEntries();
+                case 4 -> viewSpecificEntry();
+                case 5 -> editEntry();
+                case 6 -> changeMasterPassword();
+                case 7 -> {
                     exitProgram();
                     return;
-                default:
-                    System.out.println("Неверный выбор.");
+                }
+                default -> System.out.println("Неверный выбор.");
             }
         }
     }
@@ -192,29 +180,30 @@ public class Starter {
             String newPassword = entry.getPassword();
 
             switch (choice) {
-                case 1:
+                case 1 -> {
                     System.out.print("Новое место: ");
                     newPlace = scanner.nextLine().trim();
-                    break;
-                case 2:
+                }
+                case 2 -> {
                     System.out.print("Новый логин: ");
                     newLogin = scanner.nextLine().trim();
-                    break;
-                case 3:
+                }
+                case 3 -> {
                     System.out.print("Новый пароль: ");
                     newPassword = scanner.nextLine().trim();
-                    break;
-                case 4:
+                }
+                case 4 -> {
                     System.out.print("Новое место: ");
                     newPlace = scanner.nextLine().trim();
                     System.out.print("Новый логин: ");
                     newLogin = scanner.nextLine().trim();
                     System.out.print("Новый пароль: ");
                     newPassword = scanner.nextLine().trim();
-                    break;
-                default:
+                }
+                default -> {
                     System.out.println("Неверный выбор.");
                     return;
+                }
             }
 
             manager.updateEntry(index, newPlace, newLogin, newPassword);
