@@ -1,6 +1,5 @@
 package PasswordManager;
 
-
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -10,18 +9,14 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 public class AESEncryption {
-    private static final int GCM_TAG_LENGTH = 128; // 128 бит для HMAC
-    private static final int IV_LENGTH = 12;       // 12 байт для IV
-
-    public static String encrypt(byte[] encryptionKey, String... data) throws Exception {
+    public static String encryptField(byte[] encryptionKey, String field) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        byte[] iv = new byte[IV_LENGTH];
+        byte[] iv = new byte[Constants.IV_LENGTH];
         new SecureRandom().nextBytes(iv);
-        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        GCMParameterSpec spec = new GCMParameterSpec(Constants.GCM_TAG_LENGTH, iv);
 
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(encryptionKey, "AES"), spec);
-        String plaintext = String.join(",", data);
-        byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        byte[] cipherText = cipher.doFinal(field.getBytes(StandardCharsets.UTF_8));
 
         byte[] combined = new byte[iv.length + cipherText.length];
         System.arraycopy(iv, 0, combined, 0, iv.length);
@@ -30,24 +25,41 @@ public class AESEncryption {
         return Base64.getEncoder().encodeToString(combined);
     }
 
-    public static PasswordEntry decrypt(byte[] encryptionKey, String encryptedData) throws Exception {
-        byte[] decoded = Base64.getDecoder().decode(encryptedData);
+    public static String decryptField(byte[] encryptionKey, String encryptedField) throws Exception {
+        byte[] decoded = Base64.getDecoder().decode(encryptedField);
         ByteBuffer buffer = ByteBuffer.wrap(decoded);
 
-        byte[] iv = new byte[IV_LENGTH];
+        byte[] iv = new byte[Constants.IV_LENGTH];
         buffer.get(iv);
         byte[] cipherText = new byte[buffer.remaining()];
         buffer.get(cipherText);
 
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        GCMParameterSpec spec = new GCMParameterSpec(Constants.GCM_TAG_LENGTH, iv);
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(encryptionKey, "AES"), spec);
 
-        String decrypted = new String(cipher.doFinal(cipherText), StandardCharsets.UTF_8);
-        String[] parts = decrypted.split(",");
+        return new String(cipher.doFinal(cipherText), StandardCharsets.UTF_8);
+    }
+
+    // Объединение зашифрованных полей в одну строку
+    public static String encrypt(byte[] encryptionKey, String place, String login, String password) throws Exception {
+        return String.join(",",
+                encryptField(encryptionKey, place),
+                encryptField(encryptionKey, login),
+                encryptField(encryptionKey, password)
+        );
+    }
+
+    public static PasswordEntry decrypt(byte[] encryptionKey, String encryptedData) throws Exception {
+        String[] parts = encryptedData.split(",");
         if (parts.length != 3) {
             throw new Exception("Некорректный формат расшифрованных данных");
         }
-        return new PasswordEntry(parts[0], parts[1], parts[2]);
+
+        String decryptedPlace = decryptField(encryptionKey, parts[0]);
+        String decryptedLogin = decryptField(encryptionKey, parts[1]);
+        String decryptedPassword = decryptField(encryptionKey, parts[2]);
+
+        return new PasswordEntry(decryptedPlace, decryptedLogin, decryptedPassword);
     }
 }
