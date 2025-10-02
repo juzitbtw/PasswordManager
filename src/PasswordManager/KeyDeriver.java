@@ -17,7 +17,8 @@ public class KeyDeriver {
         }
 
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyLength);
-        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        // Используем PBKDF2 с HMAC-SHA3-512 через Bouncy Castle
+        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA3-512", "BC");
         return skf.generateSecret(spec).getEncoded();
     }
 }

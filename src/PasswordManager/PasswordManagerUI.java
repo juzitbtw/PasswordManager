@@ -3,25 +3,28 @@ package PasswordManager;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
-public class Starter {
+public class PasswordManagerUI {
     private static final Scanner scanner = new Scanner(System.in);
-    private static final Logger logger = Logger.getLogger(Starter.class.getName());
+    private static final Logger logger = Logger.getLogger(PasswordManagerUI.class.getName());
     private static String masterPassword;
-    private static PasswordManager manager = new PasswordManager();
+    private final PasswordManager manager;
 
-    public static void main(String[] args) {
+    public PasswordManagerUI(PasswordManager manager) {
+        this.manager = manager;
+    }
+
+    public void start() {
         initializeApplication();
         showMainMenu();
     }
 
-    private static void initializeApplication() {
-        final int MAX_ATTEMPTS = 3;
-
-        for (int attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
+    private void initializeApplication() {
+        for (int attempt = 0; attempt <= Constants.MAX_ATTEMPTS; attempt++) {
             if (attempt == 0) {
                 System.out.print("Введите мастер-пароль: ");
             } else {
-                System.out.printf("Ошибка: Проверьте пароль. У вас осталось %d попыток.\n", MAX_ATTEMPTS - attempt + 1);
+                System.out.printf("Ошибка: Проверьте пароль. У вас осталось %d попыток.\n",
+                        Constants.MAX_ATTEMPTS - attempt + 1);
                 System.out.print("Повторите ввод: ");
             }
 
@@ -32,7 +35,7 @@ public class Starter {
                 masterPassword = inputPass;
                 return;
             } catch (Exception e) {
-                if (attempt == MAX_ATTEMPTS) {
+                if (attempt == Constants.MAX_ATTEMPTS) {
                     System.out.println("Ошибка: Проверьте пароль. Попытки истекли.");
                     return;
                 }
@@ -40,7 +43,7 @@ public class Starter {
         }
     }
 
-    private static void showMainMenu() {
+    private void showMainMenu() {
         while (true) {
             printMenu();
             int choice = getMenuChoice();
@@ -54,6 +57,7 @@ public class Starter {
                 case 6 -> changeMasterPassword();
                 case 7 -> verifyDataIntegrity();
                 case 8 -> {
+                    exitProgram();
                     return;
                 }
                 default -> System.out.println("Неверный выбор.");
@@ -61,7 +65,7 @@ public class Starter {
         }
     }
 
-    private static void verifyDataIntegrity() {
+    private void verifyDataIntegrity() {
         try {
             manager.verifyIntegrity();
             System.out.println("Целостность данных подтверждена.");
@@ -70,7 +74,7 @@ public class Starter {
         }
     }
 
-    private static void printMenu() {
+    private void printMenu() {
         System.out.println("\nМенеджер паролей:");
         System.out.println("1. Добавить запись");
         System.out.println("2. Удалить запись");
@@ -83,7 +87,7 @@ public class Starter {
         System.out.print("Выберите действие: ");
     }
 
-    private static int getMenuChoice() {
+    private int getMenuChoice() {
         try {
             return Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
@@ -94,7 +98,7 @@ public class Starter {
 
     private record EntryData(String place, String login, String password) {}
 
-    private static EntryData readPasswordEntry() {
+    private EntryData readPasswordEntry() {
         System.out.print("Место: ");
         var place = scanner.nextLine().trim();
         System.out.print("Логин: ");
@@ -109,7 +113,7 @@ public class Starter {
         );
     }
 
-    private static int validateIndex(String prompt) {
+    private int validateIndex(String prompt) {
         System.out.print(prompt);
         try {
             return Integer.parseInt(scanner.nextLine());
@@ -119,47 +123,86 @@ public class Starter {
         }
     }
 
-    private static void addEntry() {
+    private void addEntry() {
         var data = readPasswordEntry();
-        manager.addEntry(data.place(), data.login(), data.password());
 
-        try {
-            manager.saveEntries(masterPassword);
-            System.out.println("Запись добавлена.");
-        } catch (Exception ex) {
-            System.out.println("Ошибка сохранения.");
-            logger.severe("Не удалось сохранить запись: " + ex.getMessage());
+        System.out.println("\nДобавление новой записи:");
+        System.out.println("Место: " + data.place());
+        System.out.println("Логин: " + data.login());
+        System.out.println("Пароль: " + data.password());
+
+        System.out.print("Подтвердить? (Y/N): ");
+        String choice = scanner.nextLine().trim().toUpperCase();
+
+        while (!choice.equals("Y") && !choice.equals("N")) {
+            System.out.print("Пожалуйста, введите Y или N: ");
+            choice = scanner.nextLine().trim().toUpperCase();
+        }
+
+        if (choice.equals("Y")) {
+            manager.addEntry(data.place(), data.login(), data.password());
+            try {
+                manager.saveEntries(masterPassword);
+                System.out.println("Запись добавлена.");
+            } catch (Exception ex) {
+                System.out.println("Ошибка сохранения.");
+                logger.severe("Не удалось сохранить запись: " + ex.getMessage());
+            }
+        } else {
+            System.out.println("Добавление отменено.");
         }
     }
 
-    private static void deleteEntry() {
+    private void deleteEntry() {
         manager.displayEntries();
         int index = validateIndex("Введите номер записи для удаления: ");
         if (index < 0) return;
 
-        try {
-            manager.removeEntry(index);
-            manager.saveEntries(masterPassword);
-            System.out.println("Запись удалена.");
-        } catch (Exception ex) {
-            System.out.println("Ошибка при удалении.");
-            logger.severe("Не удалось удалить запись: " + ex.getMessage());
+        var entry = manager.getEntry(index - 1);
+        if (entry == null) {
+            System.out.println("Неверный номер записи.");
+            return;
+        }
+
+        System.out.println("\nУдаление записи:");
+        System.out.println("Место: " + entry.getPlace());
+        System.out.println("Логин: " + entry.getLogin());
+
+        System.out.print("Подтвердить удаление? (Y/N): ");
+        String choice = scanner.nextLine().trim().toUpperCase();
+
+        while (!choice.equals("Y") && !choice.equals("N")) {
+            System.out.print("Пожалуйста, введите Y или N: ");
+            choice = scanner.nextLine().trim().toUpperCase();
+        }
+
+        if (choice.equals("Y")) {
+            try {
+                manager.removeEntry(index-1);
+                manager.saveEntries(masterPassword);
+                System.out.println("Запись удалена.");
+            } catch (Exception ex) {
+                System.out.println("Ошибка при удалении.");
+                logger.severe("Не удалось удалить запись: " + ex.getMessage());
+            }
+        } else {
+            System.out.println("Удаление отменено.");
         }
     }
 
-    private static void displayAllEntries() {
+    private void displayAllEntries() {
         System.out.println("-".repeat(20));
         System.out.println("Все записи:");
         manager.displayEntries();
         System.out.println("-".repeat(20));
     }
 
-    private static void viewSpecificEntry() {
+    private void viewSpecificEntry() {
         manager.displayEntries();
         int index = validateIndex("Введите номер записи для просмотра: ");
         if (index < 0) return;
 
-        var entry = manager.getEntry(index);
+        var entry = manager.getEntry(index - 1);
         if (entry != null) {
             System.out.println("-".repeat(20));
             System.out.println("Место: " + entry.getPlace());
@@ -173,22 +216,23 @@ public class Starter {
         }
     }
 
-    private static void editEntry() {
+    private void editEntry() {
         manager.displayEntries();
         int index = validateIndex("Введите номер записи для редактирования: ");
         if (index < 0) return;
 
-        var entry = manager.getEntry(index);
+        var entry = manager.getEntry(index - 1);
         if (entry == null) {
             System.out.println("Неверный номер записи.");
             return;
         }
 
-        System.out.println("\nВыберите, что хотите изменить:");
+        System.out.println("\nВыберите, что хотите изменить в записи " + manager.getEntry(index - 1) + " :");
         System.out.println("1. Место");
         System.out.println("2. Логин");
         System.out.println("3. Пароль");
         System.out.println("4. Все поля");
+        System.out.println("5. Отмена");
         System.out.print("Ваш выбор: ");
         int choice = scanner.nextInt();
         scanner.nextLine();
@@ -201,22 +245,34 @@ public class Starter {
             case 1 -> {
                 System.out.print("Новое место: ");
                 newPlace = scanner.nextLine().trim();
+                newPlace = newPlace.isEmpty() ? Constants.DEFAULT_PLACE : newPlace;
             }
             case 2 -> {
                 System.out.print("Новый логин: ");
                 newLogin = scanner.nextLine().trim();
+                newLogin = newLogin.isEmpty() ? Constants.DEFAULT_LOGIN : newLogin;
             }
             case 3 -> {
                 System.out.print("Новый пароль: ");
                 newPassword = scanner.nextLine().trim();
+                newPassword = newPassword.isEmpty() ? Constants.DEFAULT_PASSWORD : newPassword;
             }
             case 4 -> {
                 System.out.print("Новое место: ");
                 newPlace = scanner.nextLine().trim();
+                newPlace = newPlace.isEmpty() ? Constants.DEFAULT_PLACE : newPlace;
+
                 System.out.print("Новый логин: ");
                 newLogin = scanner.nextLine().trim();
+                newLogin = newLogin.isEmpty() ? Constants.DEFAULT_LOGIN : newLogin;
+
                 System.out.print("Новый пароль: ");
                 newPassword = scanner.nextLine().trim();
+                newPassword = newPassword.isEmpty() ? Constants.DEFAULT_PASSWORD : newPassword;
+            }
+            case 5 -> {
+                System.out.println("Редактирование отменено.");
+                return;
             }
             default -> {
                 System.out.println("Неверный выбор.");
@@ -224,7 +280,7 @@ public class Starter {
             }
         }
 
-        manager.updateEntry(index, newPlace, newLogin, newPassword);
+        manager.updateEntry(index-1, newPlace, newLogin, newPassword);
         try {
             manager.saveEntries(masterPassword);
             System.out.println("Запись обновлена.");
@@ -234,7 +290,7 @@ public class Starter {
         }
     }
 
-    private static void changeMasterPassword() {
+    private void changeMasterPassword() {
         System.out.print("Текущий мастер-пароль: ");
         var currentPass = scanner.nextLine();
 
@@ -264,7 +320,7 @@ public class Starter {
         }
     }
 
-    private static void exitProgram() {
+    private void exitProgram() {
         System.out.println("Выход из программы.");
         scanner.close();
     }

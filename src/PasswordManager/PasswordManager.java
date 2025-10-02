@@ -35,17 +35,23 @@ public class PasswordManager {
             return;
         }
 
-        String saltBase64 = lines.get(0);
-        salt = Base64.getDecoder().decode(saltBase64);
-
-        this.encryptionKey = KeyDeriver.deriveKey(masterPassword, salt, Constants.ITERATIONS, Constants.KEY_SIZE);
+        salt = Base64.getDecoder().decode(lines.get(0));
 
         entries = new ArrayList<>();
 
         for (int i = 1; i < lines.size(); i++) {
             String encryptedLine = lines.get(i);
-            PasswordEntry entry = AESEncryption.decrypt(this.encryptionKey, encryptedLine);
-            entries.add(entry);
+
+            try {
+                String decryptedLine = AESEncryption.decryptWithUniqueKeys(masterPassword, encryptedLine);
+                String[] fields = decryptedLine.split(",");
+                if (fields.length != 3) continue;
+
+                PasswordEntry entry = new PasswordEntry(fields[0], fields[1], fields[2]);
+                entries.add(entry);
+            } catch (Exception e) {
+                System.err.println("Ошибка при загрузке записи: " + e.getMessage());
+            }
         }
 
         verifyIntegrity();
@@ -53,23 +59,21 @@ public class PasswordManager {
 
     public void saveEntries(String masterPassword) throws Exception {
         boolean isNewFile = !Files.exists(Paths.get(Constants.FILE_NAME));
-
         byte[] saltToUse = isNewFile || salt == null ? KeyDeriver.generateSalt(Constants.SALT_SIZE) : salt;
         this.encryptionKey = KeyDeriver.deriveKey(masterPassword, saltToUse, Constants.ITERATIONS, Constants.KEY_SIZE);
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(Constants.FILE_NAME))) {
-            String saltBase64 = Base64.getEncoder().encodeToString(saltToUse);
-            writer.write(saltBase64);
+            writer.write(Base64.getEncoder().encodeToString(saltToUse));
             writer.newLine();
 
             for (PasswordEntry entry : entries) {
-                String encrypted = AESEncryption.encrypt(
-                        this.encryptionKey,
+                String line = AESEncryption.encryptWithUniqueKeys(
+                        masterPassword,
                         entry.getPlace(),
                         entry.getLogin(),
                         entry.getPassword()
                 );
-                writer.write(encrypted);
+                writer.write(line);
                 writer.newLine();
             }
         } catch (IOException e) {
@@ -79,6 +83,8 @@ public class PasswordManager {
         this.salt = saltToUse;
     }
 
+
+
     public void reencryptWithNewMasterPassword(String currentMasterPassword, String newMasterPassword)
             throws Exception {
         String tempFile = Constants.FILE_NAME + ".tmp";
@@ -87,11 +93,6 @@ public class PasswordManager {
         List<String> lines = Files.readAllLines(Paths.get(Constants.FILE_NAME));
         if (lines.isEmpty()) return;
 
-        String oldSaltBase64 = lines.get(0);
-        byte[] oldSalt = Base64.getDecoder().decode(oldSaltBase64);
-
-        byte[] oldEncryptionKey = KeyDeriver.deriveKey(currentMasterPassword, oldSalt, Constants.ITERATIONS,
-                Constants.KEY_SIZE);
         byte[] newSalt = KeyDeriver.generateSalt(Constants.SALT_SIZE);
         byte[] newEncryptionKey = KeyDeriver.deriveKey(newMasterPassword, newSalt, Constants.ITERATIONS,
                 Constants.KEY_SIZE);
@@ -102,16 +103,12 @@ public class PasswordManager {
 
             for (int i = 1; i < lines.size(); i++) {
                 String encryptedLine = lines.get(i);
-                PasswordEntry entry = AESEncryption.decrypt(
-                        oldEncryptionKey,
-                        encryptedLine
-                );
-                String newEncrypted = AESEncryption.encrypt(newEncryptionKey,
-                        entry.getPlace(),
-                        entry.getLogin(),
-                        entry.getPassword()
-                );
-                writer.write(newEncrypted);
+                String decryptedLine = AESEncryption.decryptWithUniqueKeys(currentMasterPassword, encryptedLine);
+                String[] fields = decryptedLine.split(",");
+                if (fields.length != 3) continue;
+
+                String newEncryptedLine = AESEncryption.encryptWithUniqueKeys(newMasterPassword, fields[0], fields[1], fields[2]);
+                writer.write(newEncryptedLine);
                 writer.newLine();
             }
         }
@@ -139,7 +136,7 @@ public class PasswordManager {
 
     public void displayEntries() {
         for (int i = 0; i < entries.size(); i++) {
-            System.out.println(i + ": " + entries.get(i).getPlace() + " - " + entries.get(i).getLogin());
+            System.out.println((i+1) + ": " + entries.get(i).getPlace() + " - " + entries.get(i).getLogin());
         }
     }
 
@@ -148,22 +145,32 @@ public class PasswordManager {
             throw new IllegalArgumentException("Неверный индекс: " + index);
         }
 
-        PasswordEntry editEntry = entries.get(index);
+        PasswordEntry oldEntry = entries.get(index);
 
-        String place = newPlace.isEmpty() ? editEntry.getPlace() : newPlace;
-        String login = newLogin.isEmpty() ? editEntry.getLogin() : newLogin;
-        String password = newPassword.isEmpty() ? editEntry.getPassword() : newPassword;
+        String place = newPlace != null && !newPlace.isEmpty() ? newPlace : oldEntry.getPlace();
+        String login = newLogin != null && !newLogin.isEmpty() ? newLogin : oldEntry.getLogin();
+        String password = newPassword != null && !newPassword.isEmpty() ? newPassword : oldEntry.getPassword();
 
-        entries.set(index, new PasswordEntry(place, login, password));
+        PasswordEntry newEntry = new PasswordEntry(
+                place.isEmpty() ? Constants.DEFAULT_PLACE : place,
+                login.isEmpty() ? Constants.DEFAULT_LOGIN : login,
+                password.isEmpty() ? Constants.DEFAULT_PASSWORD : password
+        );
+
+        newEntry.setHashPlace(oldEntry.getHashPlace());
+        newEntry.setHashLogin(oldEntry.getHashLogin());
+        newEntry.setHashPassword(oldEntry.getHashPassword());
+
+        entries.set(index, newEntry);
     }
 
     public void verifyIntegrity() {
         boolean hasErrors = false;
 
         for (PasswordEntry entry : entries) {
-            String currentPlaceHash = hash(entry.getPlace());
-            String currentLoginHash = hash(entry.getLogin());
-            String currentPasswordHash = hash(entry.getPassword());
+            String currentPlaceHash = hash(entry.getPlace(), "SHA3-256");
+            String currentLoginHash = hash(entry.getLogin(), "SHA3-256");
+            String currentPasswordHash = hash(entry.getPassword(), "SHA3-256");
 
             if (!entry.getHashPlace().equals(currentPlaceHash)) {
                 System.err.println("Хэш места не совпадает для записи: " + entry.getPlace());
@@ -180,13 +187,13 @@ public class PasswordManager {
         }
 
         if (!hasErrors) {
-            System.out.println("Все хэши совпадают. Целостность данных подтверждена.");
+            System.out.println("Все хэши совпадают.");
         }
     }
 
-    private String hash(String data) {
+    private String hash(String data, String algorithm) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(algorithm);
             byte[] hashBytes = digest.digest(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hashBytes) {
@@ -196,7 +203,7 @@ public class PasswordManager {
             }
             return hexString.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Ошибка хэширования", e);
+            throw new RuntimeException("Ошибка хэширования с алгоритмом " + algorithm, e);
         }
     }
 }
