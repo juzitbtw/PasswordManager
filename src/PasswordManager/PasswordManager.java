@@ -37,6 +37,15 @@ public class PasswordManager {
 
         salt = Base64.getDecoder().decode(lines.get(0));
 
+        if (lines.size() > 1) {
+            try {
+                String firstEncryptedLine = lines.get(1);
+                String decryptedLine = AESEncryption.decryptWithUniqueKeys(masterPassword, firstEncryptedLine);
+            } catch (Exception e) {
+                throw new Exception("Неверный мастер-пароль");
+            }
+        }
+
         entries = new ArrayList<>();
 
         for (int i = 1; i < lines.size(); i++) {
