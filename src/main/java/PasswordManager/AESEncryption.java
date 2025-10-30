@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;

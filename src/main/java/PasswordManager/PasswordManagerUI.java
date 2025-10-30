@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import java.util.Scanner;
 import java.util.logging.Logger;
@@ -8,6 +8,7 @@ public class PasswordManagerUI {
     private static final Logger logger = Logger.getLogger(PasswordManagerUI.class.getName());
     private static String masterPassword;
     private final PasswordManager manager;
+    private boolean isLoggedIn = false;
 
     public PasswordManagerUI(PasswordManager manager) {
         this.manager = manager;
@@ -19,24 +20,22 @@ public class PasswordManagerUI {
     }
 
     private void initializeApplication() {
-        for (int attempt = 0; attempt <= Constants.MAX_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < Constants.MAX_ATTEMPTS; attempt++) {
             if (attempt == 0) {
                 System.out.print("Введите мастер-пароль: ");
             } else {
-                System.out.printf("Ошибка: Проверьте пароль. У вас осталось %d попыток.\n",
-                        Constants.MAX_ATTEMPTS - attempt + 1);
+                System.out.printf("Ошибка: Проверьте пароль. У вас осталось %d попыток.\n", Constants.MAX_ATTEMPTS - attempt);
                 System.out.print("Повторите ввод: ");
             }
 
             String inputPass = scanner.nextLine();
 
-            try {
-                manager.loadEntries(inputPass);
-                masterPassword = inputPass;
+            if (manager.loadEntries(inputPass)) {
+                isLoggedIn = true;
                 return;
-            } catch (Exception e) {
-                if (attempt == Constants.MAX_ATTEMPTS) {
-                    System.out.println("Ошибка: Проверьте пароль. Попытки истекли.");
+            } else {
+                if (attempt == Constants.MAX_ATTEMPTS - 1) {
+                    System.out.println("Попытки истекли.");
                     return;
                 }
             }
@@ -44,10 +43,14 @@ public class PasswordManagerUI {
     }
 
     private void showMainMenu() {
+        if (!isLoggedIn) {
+            System.out.println("Доступ запрещён. Неверный мастер-пароль.");
+            return;
+        }
+
         while (true) {
             printMenu();
             int choice = getMenuChoice();
-
             switch (choice) {
                 case 1 -> addEntry();
                 case 2 -> deleteEntry();
@@ -65,7 +68,7 @@ public class PasswordManagerUI {
         }
     }
 
-    private void verifyDataIntegrity() {
+    public void verifyDataIntegrity() {
         try {
             manager.verifyIntegrity();
             System.out.println("Целостность данных подтверждена.");
@@ -123,7 +126,7 @@ public class PasswordManagerUI {
         }
     }
 
-    private void addEntry() {
+    public void addEntry() {
         var data = readPasswordEntry();
 
         System.out.println("\nДобавление новой записи:");
@@ -153,7 +156,7 @@ public class PasswordManagerUI {
         }
     }
 
-    private void deleteEntry() {
+    public void deleteEntry() {
         manager.displayEntries();
         int index = validateIndex("Введите номер записи для удаления: ");
         if (index < 0) return;
@@ -216,7 +219,7 @@ public class PasswordManagerUI {
         }
     }
 
-    private void editEntry() {
+    public void editEntry() {
         manager.displayEntries();
         int index = validateIndex("Введите номер записи для редактирования: ");
         if (index < 0) return;
@@ -290,7 +293,7 @@ public class PasswordManagerUI {
         }
     }
 
-    private void changeMasterPassword() {
+    public void changeMasterPassword() {
         System.out.print("Текущий мастер-пароль: ");
         var currentPass = scanner.nextLine();
 
@@ -321,7 +324,11 @@ public class PasswordManagerUI {
     }
 
     private void exitProgram() {
-        System.out.println("Выход из программы.");
+        if (!isLoggedIn) {
+            System.out.println("Доступ запрещён. Неверный мастер-пароль.");
+        } else {
+            System.out.println("Выход из программы.");
+        }
         scanner.close();
     }
 }

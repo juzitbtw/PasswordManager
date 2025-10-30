@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -22,48 +22,58 @@ public class PasswordManager {
         encryptionKey = null;
     }
 
-    public void loadEntries(String masterPassword) throws Exception {
-        if (!Files.exists(Paths.get(Constants.FILE_NAME))) {
-            Files.createFile(Paths.get(Constants.FILE_NAME));
-            salt = KeyDeriver.generateSalt(Constants.SALT_SIZE);
-            return;
-        }
+    public boolean loadEntries(String masterPassword) {
+        try {
+            if (!Files.exists(Paths.get(Constants.FILE_NAME))) {
+                salt = KeyDeriver.generateSalt(Constants.SALT_SIZE);
+                return true;
+            }
 
-        List<String> lines = Files.readAllLines(Paths.get(Constants.FILE_NAME));
-        if (lines.isEmpty()) {
-            salt = KeyDeriver.generateSalt(Constants.SALT_SIZE);
-            return;
-        }
+            List<String> lines = Files.readAllLines(Paths.get(Constants.FILE_NAME));
 
-        salt = Base64.getDecoder().decode(lines.get(0));
+            if (lines.isEmpty()) {
+                salt = KeyDeriver.generateSalt(Constants.SALT_SIZE);
+                return true;
+            }
 
-        if (lines.size() > 1) {
             try {
+                salt = Base64.getDecoder().decode(lines.get(0));
+            } catch (Exception e) {
+                return false;
+            }
+
+            if (lines.size() > 1) {
                 String firstEncryptedLine = lines.get(1);
-                String decryptedLine = AESEncryption.decryptWithUniqueKeys(masterPassword, firstEncryptedLine);
-            } catch (Exception e) {
-                throw new Exception("Неверный мастер-пароль");
+                try {
+                    AESEncryption.decryptWithUniqueKeys(masterPassword, firstEncryptedLine);
+                } catch (Exception e) {
+                    return false;
+                }
             }
-        }
 
-        entries = new ArrayList<>();
+            entries = new ArrayList<>();
 
-        for (int i = 1; i < lines.size(); i++) {
-            String encryptedLine = lines.get(i);
+            for (int i = 1; i < lines.size(); i++) {
+                String encryptedLine = lines.get(i);
 
-            try {
-                String decryptedLine = AESEncryption.decryptWithUniqueKeys(masterPassword, encryptedLine);
-                String[] fields = decryptedLine.split(",");
-                if (fields.length != 3) continue;
+                try {
+                    String decryptedLine = AESEncryption.decryptWithUniqueKeys(masterPassword, encryptedLine);
+                    String[] fields = decryptedLine.split(",");
+                    if (fields.length != 3) continue;
 
-                PasswordEntry entry = new PasswordEntry(fields[0], fields[1], fields[2]);
-                entries.add(entry);
-            } catch (Exception e) {
-                System.err.println("Ошибка при загрузке записи: " + e.getMessage());
+                    PasswordEntry entry = new PasswordEntry(fields[0], fields[1], fields[2]);
+                    entries.add(entry);
+                } catch (Exception e) {
+                    System.err.println("Ошибка при загрузке записи: " + e.getMessage());
+                }
             }
-        }
 
-        verifyIntegrity();
+            verifyIntegrity();
+            return true;
+        } catch (Exception e) {
+            System.err.println("Ошибка загрузки данных: " + e.getMessage());
+            return false;
+        }
     }
 
     public void saveEntries(String masterPassword) throws Exception {
@@ -91,8 +101,6 @@ public class PasswordManager {
 
         this.salt = saltToUse;
     }
-
-
 
     public void reencryptWithNewMasterPassword(String currentMasterPassword, String newMasterPassword)
             throws Exception {
@@ -214,5 +222,9 @@ public class PasswordManager {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Ошибка хэширования с алгоритмом " + algorithm, e);
         }
+    }
+
+    public int getEntriesCount() {
+        return entries.size();
     }
 }

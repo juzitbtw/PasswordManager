@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 public class Constants {
     protected static final String FILE_NAME = "mineSecurePasswords.txt";

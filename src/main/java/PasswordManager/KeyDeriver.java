@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;

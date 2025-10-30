@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import java.security.Security;

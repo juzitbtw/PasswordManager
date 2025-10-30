@@ -1,4 +1,4 @@
-package PasswordManager;
+package main.java.PasswordManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
