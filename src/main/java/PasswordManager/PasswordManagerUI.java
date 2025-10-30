@@ -1,5 +1,8 @@
 package main.java.PasswordManager;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
@@ -30,8 +33,14 @@ public class PasswordManagerUI {
 
             String inputPass = scanner.nextLine();
 
+            if (inputPass.isEmpty()) {
+                System.out.println("\nМастер-пароль не может быть пустым.");
+                continue;
+            }
+
             if (manager.loadEntries(inputPass)) {
                 isLoggedIn = true;
+                masterPassword = inputPass;
                 return;
             } else {
                 if (attempt == Constants.MAX_ATTEMPTS - 1) {
@@ -69,11 +78,16 @@ public class PasswordManagerUI {
     }
 
     public void verifyDataIntegrity() {
+        if (manager.getEntriesCount() == 0) {
+            System.out.println("\nНет записей для проверки целостности.");
+            return;
+        }
+
         try {
             manager.verifyIntegrity();
-            System.out.println("Целостность данных подтверждена.");
+            System.out.println("\nЦелостность данных подтверждена.");
         } catch (Exception e) {
-            System.err.println("Ошибка при проверке целостности: " + e.getMessage());
+            System.err.println("\nОшибка при проверке целостности: " + e.getMessage());
         }
     }
 
@@ -87,14 +101,14 @@ public class PasswordManagerUI {
         System.out.println("6. Изменить мастер-пароль");
         System.out.println("7. Проверить целостность данных");
         System.out.println("8. Выйти");
-        System.out.print("Выберите действие: ");
+        System.out.print("\nВыберите действие: ");
     }
 
     private int getMenuChoice() {
         try {
             return Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
-            System.out.println("Пожалуйста, введите число от 1 до 7.");
+            System.out.println("\nПожалуйста, введите число от 1 до 7.");
             return 0;
         }
     }
@@ -109,11 +123,11 @@ public class PasswordManagerUI {
         System.out.print("Пароль: ");
         var password = scanner.nextLine().trim();
 
-        return new EntryData(
-                place.isEmpty() ? "[Нет адреса]" : place,
-                login.isEmpty() ? "[Нет логина]" : login,
-                password.isEmpty() ? "[Нет пароля]" : password
-        );
+        place = place.isEmpty() ? Constants.DEFAULT_PLACE : place;
+        login = login.isEmpty() ? Constants.DEFAULT_LOGIN : login;
+        password = password.isEmpty() ? Constants.DEFAULT_PASSWORD : password;
+
+        return new EntryData(place, login, password);
     }
 
     private int validateIndex(String prompt) {
@@ -121,7 +135,7 @@ public class PasswordManagerUI {
         try {
             return Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
-            System.out.println("Неверный номер записи.");
+            System.out.println("\nНеверный номер записи.");
             return -1;
         }
     }
@@ -134,11 +148,11 @@ public class PasswordManagerUI {
         System.out.println("Логин: " + data.login());
         System.out.println("Пароль: " + data.password());
 
-        System.out.print("Подтвердить? (Y/N): ");
+        System.out.print("\nПодтвердить? (Y/N): ");
         String choice = scanner.nextLine().trim().toUpperCase();
 
         while (!choice.equals("Y") && !choice.equals("N")) {
-            System.out.print("Пожалуйста, введите Y или N: ");
+            System.out.print("\nПожалуйста, введите Y или N: ");
             choice = scanner.nextLine().trim().toUpperCase();
         }
 
@@ -146,7 +160,7 @@ public class PasswordManagerUI {
             manager.addEntry(data.place(), data.login(), data.password());
             try {
                 manager.saveEntries(masterPassword);
-                System.out.println("Запись добавлена.");
+                System.out.println("\nЗапись добавлена.");
             } catch (Exception ex) {
                 System.out.println("Ошибка сохранения.");
                 logger.severe("Не удалось сохранить запись: " + ex.getMessage());
@@ -157,13 +171,18 @@ public class PasswordManagerUI {
     }
 
     public void deleteEntry() {
+        if (manager.getEntriesCount() == 0) {
+            System.out.println("\nНет записей для удаления.");
+            return;
+        }
+
         manager.displayEntries();
-        int index = validateIndex("Введите номер записи для удаления: ");
+        int index = validateIndex("\nВведите номер записи для удаления: ");
         if (index < 0) return;
 
         var entry = manager.getEntry(index - 1);
         if (entry == null) {
-            System.out.println("Неверный номер записи.");
+            System.out.println("\nНеверный номер записи.");
             return;
         }
 
@@ -171,11 +190,11 @@ public class PasswordManagerUI {
         System.out.println("Место: " + entry.getPlace());
         System.out.println("Логин: " + entry.getLogin());
 
-        System.out.print("Подтвердить удаление? (Y/N): ");
+        System.out.print("\nПодтвердить удаление? (Y/N): ");
         String choice = scanner.nextLine().trim().toUpperCase();
 
         while (!choice.equals("Y") && !choice.equals("N")) {
-            System.out.print("Пожалуйста, введите Y или N: ");
+            System.out.print("\nПожалуйста, введите Y или N: ");
             choice = scanner.nextLine().trim().toUpperCase();
         }
 
@@ -183,9 +202,9 @@ public class PasswordManagerUI {
             try {
                 manager.removeEntry(index-1);
                 manager.saveEntries(masterPassword);
-                System.out.println("Запись удалена.");
+                System.out.println("\nЗапись удалена.");
             } catch (Exception ex) {
-                System.out.println("Ошибка при удалении.");
+                System.out.println("\nОшибка при удалении.");
                 logger.severe("Не удалось удалить запись: " + ex.getMessage());
             }
         } else {
@@ -194,6 +213,11 @@ public class PasswordManagerUI {
     }
 
     private void displayAllEntries() {
+        if (manager.getEntriesCount() == 0) {
+            System.out.println("\nНет записей для отображения.");
+            return;
+        }
+
         System.out.println("-".repeat(20));
         System.out.println("Все записи:");
         manager.displayEntries();
@@ -201,8 +225,14 @@ public class PasswordManagerUI {
     }
 
     private void viewSpecificEntry() {
+        if (manager.getEntriesCount() == 0) {
+            System.out.println("\nНет записей для просмотра.");
+            return;
+        }
+
+        System.out.println("\n");
         manager.displayEntries();
-        int index = validateIndex("Введите номер записи для просмотра: ");
+        int index = validateIndex("\nВведите номер записи для просмотра: ");
         if (index < 0) return;
 
         var entry = manager.getEntry(index - 1);
@@ -220,13 +250,18 @@ public class PasswordManagerUI {
     }
 
     public void editEntry() {
+        if (manager.getEntriesCount() == 0) {
+            System.out.println("\nНет записей для редактирования.");
+            return;
+        }
+
         manager.displayEntries();
-        int index = validateIndex("Введите номер записи для редактирования: ");
+        int index = validateIndex("\nВведите номер записи для редактирования: ");
         if (index < 0) return;
 
         var entry = manager.getEntry(index - 1);
         if (entry == null) {
-            System.out.println("Неверный номер записи.");
+            System.out.println("\nНеверный номер записи.");
             return;
         }
 
@@ -294,29 +329,46 @@ public class PasswordManagerUI {
     }
 
     public void changeMasterPassword() {
-        System.out.print("Текущий мастер-пароль: ");
+        System.out.print("\nТекущий мастер-пароль: ");
         var currentPass = scanner.nextLine();
 
         if (!currentPass.equals(masterPassword)) {
-            System.out.println("Неверный мастер-пароль.");
+            System.out.println("\nНеверный мастер-пароль.");
             return;
         }
 
-        System.out.print("Новый мастер-пароль: ");
-        var newMasterPass = scanner.nextLine();
-        System.out.print("Подтвердите новый мастер-пароль: ");
-        var confirmNewPass = scanner.nextLine();
+        String newMasterPass = "";
+        String confirmNewPass = "";
 
-        if (!newMasterPass.equals(confirmNewPass)) {
-            System.out.println("Пароли не совпадают.");
-            return;
+        while (true) {
+            System.out.print("Новый мастер-пароль: ");
+            newMasterPass = scanner.nextLine();
+            System.out.print("Подтвердите новый мастер-пароль: ");
+            confirmNewPass = scanner.nextLine();
+
+            if (newMasterPass.isEmpty() || confirmNewPass.isEmpty()) {
+                System.out.println("Пароли не могут быть пустыми.");
+                continue;
+            }
+
+            if (!newMasterPass.equals(confirmNewPass)) {
+                System.out.println("Пароли не совпадают.");
+                continue;
+            }
+            break;
         }
 
         masterPassword = newMasterPass;
 
         try {
-            manager.reencryptWithNewMasterPassword(currentPass, newMasterPass);
-            System.out.println("Мастер-пароль успешно изменён.");
+            Path filePath = Paths.get(Constants.FILE_NAME);
+            if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                manager.reencryptWithNewMasterPassword(currentPass, newMasterPass);
+                System.out.println("\nМастер-пароль успешно изменён.");
+            } else {
+                masterPassword = newMasterPass;
+                System.out.println("\nМастер-пароль успешно изменён.");
+            }
         } catch (Exception ex) {
             System.out.println("Ошибка при изменении мастер-пароля: " + ex.getMessage());
             logger.severe("Не удалось изменить мастер-пароль: " + ex.getMessage());
